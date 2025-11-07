@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FastImageUpload } from "@/components/FastImageUpload";
+import { SimpleImageUpload } from "@/components/SimpleImageUpload";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -109,9 +110,12 @@ export default function Home() {
   const deleteMutation = trpc.player.delete.useMutation({
     onSuccess: () => {
       toast.success("تم حذف اللاعب بنجاح");
+      // Optimistic update - remove from UI immediately
       setPage(0);
-      setAllPlayers([]);
-      refetchPlayers();
+      setTimeout(() => {
+        setAllPlayers([]);
+        refetchPlayers();
+      }, 100);
     },
     onError: (error) => {
       toast.error(`فشل الحذف: ${error.message}`);
@@ -129,15 +133,15 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container py-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="container py-4 md:py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-bold">أرشيف اللاعبين</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-2xl md:text-3xl font-bold">أرشيف اللاعبين</h1>
+              <p className="text-muted-foreground mt-1 text-sm md:text-base">
                 نظام إدارة متكامل مع تحسين الصور وتحويل الشعارات
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="icon"
@@ -151,42 +155,43 @@ export default function Home() {
                 )}
               </Button>
               {isAdmin ? (
-                <Button variant="outline" onClick={() => adminLogout()}>
+                <Button variant="outline" onClick={() => adminLogout()} className="text-sm">
                   <LogOut className="w-4 h-4 ml-2" />
-                  تسجيل خروج ({admin?.username})
+                  <span className="hidden sm:inline">تسجيل خروج ({admin?.username})</span>
+                  <span className="sm:hidden">خروج</span>
                 </Button>
               ) : (
-                <Button onClick={() => setShowLoginDialog(true)}>
+                <Button onClick={() => setShowLoginDialog(true)} className="text-sm">
                   <LogIn className="w-4 h-4 ml-2" />
-                  تسجيل دخول المشرف
+                  <span className="hidden sm:inline">تسجيل دخول المشرف</span>
+                  <span className="sm:hidden">دخول</span>
                 </Button>
               )}
             </div>
           </div>
 
           {/* Search Bar */}
-          <div className="flex gap-2 mb-4">
-            <Input
-              placeholder="ابحث عن لاعب بالعربية أو الإنجليزية..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch}>
-              <Search className="w-4 h-4 ml-2" />
-              بحث
-            </Button>
-          </div>
-
-          {isAdmin && (
-            <div className="flex gap-2">
-              <Button onClick={() => setShowAddDialog(true)}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-2 flex-1">
+              <Input
+                placeholder="ابحث عن لاعب..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                className="flex-1"
+              />
+              <Button onClick={handleSearch} className="shrink-0">
+                <Search className="w-4 h-4 sm:ml-2" />
+                <span className="hidden sm:inline">بحث</span>
+              </Button>
+            </div>
+            {isAdmin && (
+              <Button onClick={() => setShowAddDialog(true)} className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 ml-2" />
                 إضافة لاعب
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
@@ -255,9 +260,12 @@ export default function Home() {
         onSuccess={() => {
           setShowAddDialog(false);
           setSelectedPlayer(null);
-          setPage(0);
-          setAllPlayers([]);
-          refetchPlayers();
+          // Optimistic update with slight delay
+          setTimeout(() => {
+            setPage(0);
+            setAllPlayers([]);
+            refetchPlayers();
+          }, 100);
         }}
       />
 
@@ -462,22 +470,16 @@ function AddPlayerDialog({ open, onOpenChange, player, onSuccess }: any) {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">صورة الغلاف</label>
-            <FastImageUpload
-              onUploadComplete={(url) => {
-                setCoverImage(url);
-                toast.success("تم رفع الصورة بنجاح");
+            <SimpleImageUpload
+              onUploadComplete={(base64) => {
+                setCoverImage(base64);
+                if (base64) {
+                  toast.success("تم اختيار الصورة");
+                }
               }}
               buttonText="رفع صورة الغلاف"
+              currentImage={coverImage}
             />
-            {coverImage && (
-              <div className="mt-2">
-                <img
-                  src={coverImage}
-                  alt="Cover preview"
-                  className="w-full h-32 object-cover rounded"
-                />
-              </div>
-            )}
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -638,11 +640,31 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
         {selectedImage && (
           <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
             <DialogContent className="sm:max-w-4xl">
-              <img
-                src={selectedImage.imageUrl}
-                alt=""
-                className="w-full h-auto"
-              />
+              <div className="relative">
+                <img
+                  src={selectedImage.imageUrl}
+                  alt=""
+                  className="w-full h-auto rounded"
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = selectedImage.imageUrl;
+                      link.download = `player-image-${selectedImage.id}.jpg`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      toast.success("جاري تحميل الصورة...");
+                    }}
+                  >
+                    <Upload className="w-4 h-4 ml-1" />
+                    تحميل
+                  </Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
         )}

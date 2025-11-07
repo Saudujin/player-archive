@@ -118,38 +118,62 @@ export async function searchPlayers(query: string) {
   // Get all players
   const allPlayers = await db.select().from(players).orderBy(desc(players.createdAt));
   
-  // Filter players that match any of the extracted names
+  // If no names extracted, return empty
+  if (names.length === 0) return [];
+  
+  // Track which players match which search terms
+  const playerMatches = new Map<number, number>();
+  
+  // Filter players that match ALL extracted names (AND logic)
   const matchedPlayers = allPlayers.filter(player => {
     // Parse keywords if it's JSON
-    let keywordsText = '';
+    let keywordsArray: string[] = [];
     try {
-      const keywords = player.keywords ? JSON.parse(player.keywords) : [];
-      keywordsText = Array.isArray(keywords) ? keywords.join(' ') : player.keywords || '';
+      const parsed = player.keywords ? JSON.parse(player.keywords) : [];
+      keywordsArray = Array.isArray(parsed) ? parsed : [];
     } catch {
-      keywordsText = player.keywords || '';
+      keywordsArray = [];
     }
     
-    const searchableText = [
-      player.nameArabic,
-      player.nameEnglish,
+    // Build searchable fields separately for better matching
+    const searchFields = [
+      player.nameArabic || '',
+      player.nameEnglish || '',
       player.alternativeNames || '',
-      keywordsText,
-      player.teamName || ''
-    ].join(' ').toLowerCase();
+      player.teamName || '',
+      ...keywordsArray
+    ];
     
-    console.log(`[Search] Player: ${player.nameArabic}, Keywords raw: "${player.keywords}", Parsed: "${keywordsText}"`);
-    
-    // Normalize searchable text
-    const normalizedText = normalizeArabic(searchableText) + ' ' + normalizeEnglish(searchableText);
-    
-    // Check if any extracted name matches
-    return names.some(name => {
-      const normalizedName = normalizeArabic(name) + ' ' + normalizeEnglish(name);
-      return normalizedText.includes(normalizedName);
+    // Normalize all fields
+    const normalizedFields = searchFields.map(field => {
+      const lower = field.toLowerCase();
+      return normalizeArabic(lower) + ' ' + normalizeEnglish(lower);
     });
+    
+    // Check if ALL names match (each name must match at least one field)
+    const allNamesMatch = names.every(name => {
+      const normalizedName = normalizeArabic(name.toLowerCase()) + ' ' + normalizeEnglish(name.toLowerCase());
+      return normalizedFields.some(field => field.includes(normalizedName));
+    });
+    
+    if (allNamesMatch) {
+      // Count how many search terms matched
+      const matchCount = names.filter(name => {
+        const normalizedName = normalizeArabic(name.toLowerCase()) + ' ' + normalizeEnglish(name.toLowerCase());
+        return normalizedFields.some(field => field.includes(normalizedName));
+      }).length;
+      playerMatches.set(player.id, matchCount);
+    }
+    
+    return allNamesMatch;
   });
   
-  return matchedPlayers;
+  // Sort by number of matches (more matches = higher relevance)
+  return matchedPlayers.sort((a, b) => {
+    const matchesA = playerMatches.get(a.id) || 0;
+    const matchesB = playerMatches.get(b.id) || 0;
+    return matchesB - matchesA;
+  });
 }
 
 export async function createPlayer(player: InsertPlayer) {
