@@ -348,8 +348,8 @@ function AddPlayerDialog({ open, onOpenChange, player, onSuccess }: any) {
       nameArabic,
       nameEnglish,
       teamName: teamName.trim() || undefined,
-      keywords: JSON.stringify(keywordsArray),
-      coverImageUrl: coverImage || undefined,
+      keywords: keywordsArray,
+      coverImageBase64: coverImage || undefined,
     };
 
     if (player) {
