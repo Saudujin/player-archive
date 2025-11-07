@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>أرشيف اللاعبين</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0f1115; --card:#151824; --muted:#97a1b2; --text:#fff; --accent:#6ee7b7; }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:'Tajawal',system-ui}
+.wrap{max-width:1100px;margin:0 auto;padding:24px}
+.headline{font-size:28px;font-weight:700;margin:4px 0 10px}
+.sub{color:var(--muted);margin-bottom:18px}
+.search{display:flex;gap:10px;align-items:center}
+.search input{flex:1;padding:14px 16px;border:none;border-radius:14px;background:#0c0f18;color:var(--text);font-size:16px;outline:none}
+.btn{background:var(--accent);color:#0d0f14;border:none;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:22px}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.thumb{width:100%;aspect-ratio:16/10;object-fit:cover;background:#0c0f18}
+.card-body{padding:12px 12px 14px}
+.title{font-weight:700;margin:6px 0 6px}
+.meta{color:var(--muted);font-size:13px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+.pill{font-size:12px;background:#0c0f18;color:var(--muted);padding:6px 10px;border-radius:999px}
+.empty{color:var(--muted);padding:18px;text-align:center;border:1px dashed #2b3242;border-radius:14px;margin-top:16px}
+.footer{color:#7c869a;font-size:12px;margin-top:22px}
+.help{margin-top:10px;color:#b9c3d3;line-height:1.9}
+a.btn{display:inline-block;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="headline">أرشيف اللاعبين</div>
+<div class="sub">اكتب اسم لاعب أو أكثر (مثال: <b>مهند</b> أو <b>مهند و فارس</b>) – نفهم الصيغ المختلفة مثل «ابي صور لـ مهند وفارس».</div>
+
+
+<div class="search">
+<input id="q" placeholder="ابحث هنا… مثل: اللاعب 1 واللاعب 2 / صور فيصل و ناصر" />
+<button class="btn" id="go">بحث</button>
+</div>
+
+
+<div class="help">
+• ألبوماتك وروابطها تُعرّف في <b>playerCatalog</b> بالأسفل. عدّل الأسماء والروابط فقط.<br/>
+• يدعم العربية والإنجليزية، ويستخرج الأسماء حتى لو كانت داخل جملة طويلة.
+</div>
+
+
+<div id="results" class="grid"></div>
+<div id="empty" class="empty" style="display:none">ما لقينا نتائج. جرّب تكتب الاسم بشكل أبسط، أو اسم لاعب واحد أولًا.</div>
+
+
+<div class="footer">نسخة صفحة واحدة. ارفعها على Netlify أو GitHub Pages. غيّر البيانات داخل الكود فقط.</div>
+</div>
+
+
+<script>
+// ===== 1) بيانات الأرشيف (عدّل هنا فقط) =====
+// لكل لاعب: اسم العرض، أسماء بديلة/تهجئات، رابط الألبوم (مجلد صور، صفحة، Google Photos، إلخ)، صورة غلاف اختيارية، كلمات مفتاحية اختيارية.
+const playerCatalog = [
+{
+id: 'p1',
+name: 'مهند',
+aliases: ['مهند', 'mohannad', 'muhanad', 'اللاعب 1', 'Muhanad'],
+albumUrl: 'https://example.com/albums/mohanad',
+cover: 'https://picsum.photos/id/237/800/500',
+keywords: ['مهاجم','#9','team falcons']
+},
+{
+id: 'p2',
+name: 'فارس',
+aliases: ['فارس', 'fares', 'faris', 'اللاعب 2', 'Faris'],
+albumUrl: 'https://example.com/albums/faris',
+cover: 'https://picsum.photos/id/1062/800/500',
+keywords: ['mid','playmaker']
+},
+{
+id: 'p3',
+name: 'ناصر',
+aliases: ['ناصر', 'nasser', 'alnasser', 'اللاعب 3', 'Nasser'],
+albumUrl: 'https://example.com/albums/nasser',
+cover: 'https://picsum.photos/id/1027/800/500',
+keywords: ['GK','حارس']
+}
+];
+
+
+// ===== 2) أدوات مساعدة للبحث =====
+const arabicMap = {
+'أ':'ا','إ':'ا','آ':'ا','ى':'ي','ة':'ه','ؤ':'و','ئ':'ي','ٱ':'ا','ٰ':'', 'ـ':''
+};
+function normalizeArabic(str=''){
+return str
+.toLowerCase()
+.replace(/[\u064B-\u065F]/g,'') // حركات
+.replace(/[أإآٱ]/g,'ا')
+.replace(/ة/g,'ه')
+.replace(/ى/g,'ي')
+.replace(/ـ/g,'')
+.replace(/\s+/g,' ') // مسافات زايدة
+.trim();
+}
+function normalizeLatin(str=''){
+return str.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+function nrm(str=''){
+const a = normalizeArabic(str);
+const l = normalizeLatin(str);
+return a || l;
+}
+
+// ===== 3) استخراج الأسماء من النص =====
+// يدعم: "مهند وفارس"، "صور مهند و فارس"، "ابي ألبوم مهند"، إلخ
+function extractPlayerNames(query){
+const q = query.trim();
+if(!q) return [];
+
+// نرمّل الاستعلام
+const normQ = nrm(q);
+
+// نجمع كل الأسماء البديلة من الكتالوج
+const allAliases = [];
+for(const p of playerCatalog){
+for(const alias of p.aliases){
+allAliases.push({ player:p, alias, normAlias:nrm(alias) });
+}
+}
+
+// نبحث عن تطابقات
+const found = new Set();
+for(const {player, normAlias} of allAliases){
+if(normQ.includes(normAlias)){
+found.add(player.id);
+}
+}
+
+return playerCatalog.filter(p => found.has(p.id));
+}
+
+// ===== 4) عرض النتائج =====
+function renderResults(players){
+const container = document.getElementById('results');
+const emptyMsg = document.getElementById('empty');
+
+if(players.length === 0){
+container.innerHTML = '';
+emptyMsg.style.display = 'block';
+return;
+}
+
+emptyMsg.style.display = 'none';
+container.innerHTML = players.map(p => {
+const kw = (p.keywords || []).slice(0,2).map(k => `<span class="pill">${k}</span>`).join('');
+return `
+<div class="card">
+<img class="thumb" src="${p.cover}" alt="${p.name}" loading="lazy" />
+<div class="card-body">
+<div class="title">${p.name}</div>
+<div class="meta">${p.aliases.slice(0,3).join(' • ')}</div>
+<div class="row">
+<div>${kw}</div>
+<a class="btn" href="${p.albumUrl}" target="_blank">فتح الألبوم</a>
+</div>
+</div>
+</div>
+`;
+}).join('');
+}
+
+// ===== 5) ربط الأحداث =====
+document.getElementById('go').addEventListener('click', () => {
+const query = document.getElementById('q').value;
+const results = extractPlayerNames(query);
+renderResults(results);
+});
+
+document.getElementById('q').addEventListener('keypress', (e) => {
+if(e.key === 'Enter'){
+document.getElementById('go').click();
+}
+});
+
+// عرض كل اللاعبين عند التحميل
+renderResults(playerCatalog);
+</script>
+</body>
+</html>
