@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE players SET keywords = '[\"falcons\"]' WHERE nameArabic = 'سعود'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3GBSrrUWsoag2xs.beeb1abb56de --database VCouJc2Nfk9FZV5kWq7Shf --execute UPDATE players SET keywords = '[\"falcons\"]' WHERE nameArabic = 'سعود'",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 405
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,15 +29,13 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
-import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import AdminLoginDialog from "@/components/AdminLoginDialog";
+import { getLoginUrl } from "@/const";
 
 export default function Home() {
-  const { admin, isAdmin, logout: adminLogout } = useAdminAuth();
+  const { user, loading: authLoading, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [showLoginDialog, setShowLoginDialog] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -61,16 +60,7 @@ export default function Home() {
 
   const displayedPlayers = debouncedSearch.trim() ? searchResults || [] : players;
 
-  // Delete player mutation
-  const deleteMutation = trpc.player.delete.useMutation({
-    onSuccess: () => {
-      toast.success("تم حذف اللاعب بنجاح");
-      refetchPlayers();
-    },
-    onError: (error) => {
-      toast.error(`فشل الحذف: ${error.message}`);
-    },
-  });
+  const isAdmin = user?.role === "admin";
 
   const handleSearch = () => {
     // Search is automatic via useQuery
@@ -104,15 +94,15 @@ export default function Home() {
                   <Moon className="w-5 h-5" />
                 )}
               </Button>
-              {isAdmin ? (
-                <Button variant="outline" onClick={() => adminLogout()}>
+              {isAuthenticated ? (
+                <Button variant="outline" onClick={() => logout()}>
                   <LogOut className="w-4 h-4 ml-2" />
-                  تسجيل خروج ({admin?.username})
+                  تسجيل خروج
                 </Button>
               ) : (
-                <Button onClick={() => setShowLoginDialog(true)}>
+                <Button onClick={() => (window.location.href = getLoginUrl())}>
                   <LogIn className="w-4 h-4 ml-2" />
-                  تسجيل دخول المشرف
+                  تسجيل دخول
                 </Button>
               )}
             </div>
@@ -175,9 +165,11 @@ export default function Home() {
                     setSelectedPlayer(p);
                     setShowAddDialog(true);
                   }}
-                  onDelete={(id) => {
-                    if (confirm("هل أنت متأكد من حذف هذا اللاعب؟ سيتم حذف جميع صوره أيضاً.")) {
-                      deleteMutation.mutate({ id });
+                  onDelete={async (id) => {
+                    if (confirm("هل أنت متأكد من حذف هذا اللاعب؟")) {
+                      // Will implement delete mutation
+                      toast.success("تم حذف اللاعب");
+                      refetchPlayers();
                     }
                   }}
                 />
@@ -208,9 +200,6 @@ export default function Home() {
           isAdmin={isAdmin}
         />
       )}
-
-      {/* Admin Login Dialog */}
-      <AdminLoginDialog open={showLoginDialog} onOpenChange={setShowLoginDialog} />
     </div>
   );
 }
@@ -333,8 +322,19 @@ function AddPlayerDialog({ open, onOpenChange, player, onSuccess }: any) {
     setCoverImage(null);
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = () => {
-    if (!nameArabic.trim() || !nameEnglish.trim()) {
+    if (!nameArabic || !nameEnglish) {
       toast.error("الرجاء إدخال الاسم بالعربية والإنجليزية");
       return;
     }
@@ -344,77 +344,74 @@ function AddPlayerDialog({ open, onOpenChange, player, onSuccess }: any) {
       .map((k) => k.trim())
       .filter((k) => k);
 
-    const data = {
-      nameArabic,
-      nameEnglish,
-      teamName: teamName.trim() || undefined,
-      keywords: JSON.stringify(keywordsArray),
-      coverImageUrl: coverImage || undefined,
-    };
-
     if (player) {
-      updateMutation.mutate({ id: player.id, ...data });
+      updateMutation.mutate({
+        id: player.id,
+        nameArabic,
+        nameEnglish,
+        teamName,
+        keywords: keywordsArray,
+        coverImageBase64: coverImage || undefined,
+      });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({
+        nameArabic,
+        nameEnglish,
+        teamName,
+        keywords: keywordsArray,
+        coverImageBase64: coverImage || undefined,
+      });
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{player ? "تعديل لاعب" : "إضافة لاعب جديد"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">الاسم بالعربية *</label>
+            <label className="text-sm font-medium">الاسم بالعربية</label>
             <Input
               value={nameArabic}
               onChange={(e) => setNameArabic(e.target.value)}
-              placeholder="مثال: محمد صلاح"
+              placeholder="مثال: مهند"
             />
           </div>
           <div>
-            <label className="text-sm font-medium">الاسم بالإنجليزية *</label>
+            <label className="text-sm font-medium">الاسم بالإنجليزية</label>
             <Input
               value={nameEnglish}
               onChange={(e) => setNameEnglish(e.target.value)}
-              placeholder="Example: Mohamed Salah"
+              placeholder="Example: Mohannad"
             />
           </div>
           <div>
-            <label className="text-sm font-medium">الفريق</label>
+            <label className="text-sm font-medium">اسم الفريق</label>
             <Input
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              placeholder="مثال: ليفربول"
+              placeholder="مثال: Team Falcons"
             />
           </div>
           <div>
-            <label className="text-sm font-medium">الكلمات المفتاحية</label>
+            <label className="text-sm font-medium">الكلمات المفتاحية (مفصولة بفاصلة)</label>
             <Input
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
-              placeholder="افصل بفاصلة: محمد، صلاح، مصر"
+              placeholder="مثال: لاعب, فريق, بطولة"
             />
           </div>
           <div>
-            <label className="text-sm font-medium mb-2 block">صورة الغلاف</label>
-            <FastImageUpload
-              onUploadComplete={(url) => {
-                setCoverImage(url);
-                toast.success("تم رفع الصورة بنجاح");
-              }}
-              buttonText="رفع صورة الغلاف"
-            />
+            <label className="text-sm font-medium">صورة الغلاف</label>
+            <Input type="file" accept="image/*" onChange={handleImageChange} />
             {coverImage && (
-              <div className="mt-2">
-                <img
-                  src={coverImage}
-                  alt="Cover preview"
-                  className="w-full h-32 object-cover rounded"
-                />
-              </div>
+              <img
+                src={coverImage}
+                alt="Preview"
+                className="mt-2 w-32 h-32 object-cover rounded"
+              />
             )}
           </div>
           <div className="flex gap-2 justify-end">
@@ -439,148 +436,192 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  const { data: images = [], refetch: refetchImages } = trpc.playerImage.list.useQuery(
-    { playerId: player.id },
-    { enabled: open }
-  );
+  const { data: images = [], refetch: refetchImages } =
+    trpc.playerImage.list.useQuery(
+      { playerId: player.id },
+      { enabled: !!player.id }
+    );
+
+  const uploadMutation = trpc.playerImage.upload.useMutation({
+    onSuccess: () => {
+      toast.success("تم رفع الصورة بنجاح");
+      refetchImages();
+      setShowUploadDialog(false);
+    },
+  });
 
   const upscaleMutation = trpc.playerImage.upscale.useMutation({
     onSuccess: () => {
       toast.success("تم تحسين الصورة بنجاح");
       refetchImages();
     },
-    onError: (error) => {
-      toast.error(`فشل التحسين: ${error.message}`);
-    },
   });
 
   const vectorizeMutation = trpc.vectorLogo.vectorize.useMutation({
-    onSuccess: () => {
-      toast.success("تم تحويل الشعار إلى SVG بنجاح");
-      refetchImages();
-    },
-    onError: (error) => {
-      toast.error(`فشل التحويل: ${error.message}`);
+    onSuccess: (data) => {
+      toast.success("تم تحويل الشعار إلى Vector");
+      window.open(data.pdfUrl, "_blank");
     },
   });
 
-  const deleteImageMutation = trpc.playerImage.delete.useMutation({
-    onSuccess: () => {
-      toast.success("تم حذف الصورة بنجاح");
-      refetchImages();
-    },
-    onError: (error) => {
-      toast.error(`فشل الحذف: ${error.message}`);
-    },
-  });
+  const handleUpload = (imageBase64: string) => {
+    uploadMutation.mutate({
+      playerId: player.id,
+      imageBase64,
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            ألبوم {player.nameArabic} ({images.length} صورة)
-          </DialogTitle>
+          <DialogTitle>ألبوم {player.nameArabic}</DialogTitle>
         </DialogHeader>
-
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="mb-4">
             <Button onClick={() => setShowUploadDialog(true)}>
               <Upload className="w-4 h-4 ml-2" />
-              رفع صور جديدة
+              رفع صورة
             </Button>
           </div>
         )}
-
         {images.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
+          <div className="text-center py-12 text-muted-foreground">
             لا توجد صور في الألبوم
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {images.map((img: any) => (
               <div key={img.id} className="relative group">
                 <img
-                  src={img.thumbnailUrl || img.imageUrl}
-                  alt=""
-                  className="w-full aspect-square object-cover rounded cursor-pointer hover:opacity-80 transition"
-                  onClick={() => setSelectedImage(img)}
+                  src={img.imageUrl}
+                  alt={img.caption || ""}
+                  className="w-full aspect-square object-cover rounded cursor-pointer"
                   loading="lazy"
+                  decoding="async"
+                  onClick={() => setSelectedImage(img)}
                 />
-                <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="flex-1 text-xs"
-                    onClick={() => upscaleMutation.mutate({ imageId: img.id })}
-                    disabled={upscaleMutation.isPending}
-                  >
-                    <Sparkles className="w-3 h-3 ml-1" />
-                    تحسين
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="flex-1 text-xs"
-                    onClick={() => vectorizeMutation.mutate({ imageId: img.id })}
-                    disabled={vectorizeMutation.isPending}
-                  >
-                    <FileType className="w-3 h-3 ml-1" />
-                    SVG
-                  </Button>
-                  {isAdmin && (
+                {isAdmin && (
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       size="sm"
-                      variant="destructive"
-                      onClick={() => {
-                        if (confirm("هل أنت متأكد من حذف هذه الصورة؟")) {
-                          deleteImageMutation.mutate({ id: img.id });
-                        }
-                      }}
+                      variant="secondary"
+                      onClick={() => upscaleMutation.mutate({ imageId: img.id })}
+                      disabled={upscaleMutation.isPending}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Sparkles className="w-3 h-3" />
                     </Button>
-                  )}
-                </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => vectorizeMutation.mutate({ imageId: img.id })}
+                      disabled={vectorizeMutation.isPending}
+                    >
+                      <FileType className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+                {img.isUpscaled && (
+                  <Badge className="absolute bottom-2 left-2" variant="secondary">
+                    محسّنة
+                  </Badge>
+                )}
               </div>
             ))}
           </div>
         )}
 
         {/* Upload Dialog */}
-        {showUploadDialog && (
-          <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>رفع صور جديدة</DialogTitle>
-              </DialogHeader>
-              <FastImageUpload
-                onUploadComplete={(url) => {
-                  // Save to database
-                  toast.success("تم رفع الصورة");
-                  setShowUploadDialog(false);
-                  refetchImages();
-                }}
-                buttonText="اختر الصور"
-                multiple
-              />
-            </DialogContent>
-          </Dialog>
-        )}
+        <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>رفع صور للألبوم</DialogTitle>
+            </DialogHeader>
+            <FastImageUpload
+              playerId={player.id}
+              onSuccess={() => {
+                refetchImages();
+                setShowUploadDialog(false);
+              }}
+              multiple={true}
+            />
+          </DialogContent>
+        </Dialog>
 
-        {/* Lightbox */}
+        {/* Full Image View */}
         {selectedImage && (
           <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-            <DialogContent className="sm:max-w-4xl">
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{selectedImage.caption || "عرض الصورة"}</DialogTitle>
+              </DialogHeader>
               <img
                 src={selectedImage.imageUrl}
-                alt=""
-                className="w-full h-auto"
+                alt={selectedImage.caption || ""}
+                className="w-full h-auto rounded"
               />
+              <div className="flex gap-2 mt-4">
+                <Button
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = selectedImage.imageUrl;
+                    a.download = `image-${selectedImage.id}.jpg`;
+                    a.click();
+                  }}
+                  className="flex-1"
+                >
+                  تحميل الصورة
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Image Upload Dialog
+function ImageUploadDialog({ onUpload, onClose }: any) {
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <Card className="w-96">
+        <CardContent className="p-6">
+          <h3 className="font-bold mb-4">رفع صورة</h3>
+          <Input type="file" accept="image/*" onChange={handleFileChange} />
+          {imageBase64 && (
+            <img
+              src={imageBase64}
+              alt="Preview"
+              className="mt-4 w-full h-48 object-cover rounded"
+            />
+          )}
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => imageBase64 && onUpload(imageBase64)}
+              disabled={!imageBase64}
+            >
+              رفع
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

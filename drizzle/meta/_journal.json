@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1762510965811,
+      "tag": "0000_illegal_newton_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1762511384582,
+      "tag": "0001_perpetual_madripoor",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1762516968332,
+      "tag": "0002_ambiguous_radioactive_man",
+      "breakpoints": true
+    }
+  ]
+}

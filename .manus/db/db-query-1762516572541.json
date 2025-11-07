@@ -1,0 +1,31 @@
+{
+  "query": "SELECT id, nameArabic, nameEnglish, keywords, teamName FROM players LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3GBSrrUWsoag2xs.beeb1abb56de --database VCouJc2Nfk9FZV5kWq7Shf --execute SELECT id, nameArabic, nameEnglish, keywords, teamName FROM players LIMIT 5",
+  "rows": [
+    {
+      "id": "1",
+      "nameArabic": "سعود",
+      "nameEnglish": "saud",
+      "keywords": "[\"يوسف\",\"يوسيف\",\"يوسوووف\"]",
+      "teamName": "falcons"
+    },
+    {
+      "id": "30001",
+      "nameArabic": "احمد",
+      "nameEnglish": "ahmad",
+      "keywords": "[]",
+      "teamName": "فثشة بشمؤخىس"
+    },
+    {
+      "id": "30002",
+      "nameArabic": "فالكونز",
+      "nameEnglish": "falcons",
+      "keywords": "[\"-\"]",
+      "teamName": "-"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnameArabic\tnameEnglish\tkeywords\tteamName\n1\tسعود\tsaud\t[\"يوسف\",\"يوسيف\",\"يوسوووف\"]\tfalcons\n30001\tاحمد\tahmad\t[]\tفثشة بشمؤخىس\n30002\tفالكونز\tfalcons\t[\"-\"]\t-\n",
+  "stderr": "",
+  "execution_time_ms": 440
+}
