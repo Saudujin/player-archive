@@ -49,22 +49,59 @@ export default function Home() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showGalleryDialog, setShowGalleryDialog] = useState(false);
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [allPlayers, setAllPlayers] = useState<any[]>([]);
+  const ITEMS_PER_PAGE = 20;
+
   // Queries with caching
-  const { data: players = [], refetch: refetchPlayers } = trpc.player.list.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-  });
-  const { data: searchResults } = trpc.player.search.useQuery(
-    { query: debouncedSearch },
-    { enabled: debouncedSearch.trim().length > 0 }
+  const { data: paginatedData, refetch: refetchPlayers, isFetching } = trpc.player.listPaginated.useQuery(
+    { limit: ITEMS_PER_PAGE, offset: page * ITEMS_PER_PAGE },
+    {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      enabled: !debouncedSearch.trim(),
+      onSuccess: (data) => {
+        if (page === 0) {
+          setAllPlayers(data.players);
+        } else {
+          setAllPlayers(prev => [...prev, ...data.players]);
+        }
+      },
+    }
   );
 
-  const displayedPlayers = debouncedSearch.trim() ? searchResults || [] : players;
+  const { data: searchResults } = trpc.player.search.useQuery(
+    { query: debouncedSearch },
+    { 
+      enabled: debouncedSearch.trim().length > 0,
+      staleTime: 2 * 60 * 1000,
+    }
+  );
+
+  const displayedPlayers = debouncedSearch.trim() ? searchResults || [] : allPlayers;
+  const hasMore = paginatedData?.hasMore || false;
+
+  // Reset pagination when search changes
+  useEffect(() => {
+    if (debouncedSearch.trim()) {
+      setPage(0);
+      setAllPlayers([]);
+    }
+  }, [debouncedSearch]);
+
+  // Load more function
+  const loadMore = () => {
+    if (!isFetching && hasMore && !debouncedSearch.trim()) {
+      setPage(prev => prev + 1);
+    }
+  };
 
   // Delete player mutation
   const deleteMutation = trpc.player.delete.useMutation({
     onSuccess: () => {
       toast.success("تم حذف اللاعب بنجاح");
+      setPage(0);
+      setAllPlayers([]);
       refetchPlayers();
     },
     onError: (error) => {
@@ -183,6 +220,20 @@ export default function Home() {
                 />
               ))}
             </div>
+            
+            {/* Load More Button */}
+            {!debouncedSearch.trim() && hasMore && (
+              <div className="mt-8 text-center">
+                <Button 
+                  onClick={loadMore} 
+                  disabled={isFetching}
+                  variant="outline"
+                  size="lg"
+                >
+                  {isFetching ? "جاري التحميل..." : "تحميل المزيد"}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -195,6 +246,8 @@ export default function Home() {
         onSuccess={() => {
           setShowAddDialog(false);
           setSelectedPlayer(null);
+          setPage(0);
+          setAllPlayers([]);
           refetchPlayers();
         }}
       />

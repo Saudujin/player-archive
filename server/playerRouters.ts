@@ -16,6 +16,25 @@ export const playerRouter = router({
     return await db.getAllPlayers();
   }),
 
+  // Public: Get players with pagination
+  listPaginated: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const players = await db.getAllPlayers();
+      const total = players.length;
+      const paginatedPlayers = players.slice(input.offset, input.offset + input.limit);
+      return {
+        players: paginatedPlayers,
+        total,
+        hasMore: input.offset + input.limit < total,
+      };
+    }),
+
   // Public: Get player by ID
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
