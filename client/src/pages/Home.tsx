@@ -60,15 +60,24 @@ export default function Home() {
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       enabled: !debouncedSearch.trim(),
-      onSuccess: (data) => {
-        if (page === 0) {
-          setAllPlayers(data.players);
-        } else {
-          setAllPlayers(prev => [...prev, ...data.players]);
-        }
-      },
     }
   );
+
+  // Update allPlayers when paginatedData changes
+  useEffect(() => {
+    if (paginatedData?.players) {
+      if (page === 0) {
+        setAllPlayers(paginatedData.players);
+      } else {
+        setAllPlayers(prev => {
+          // Avoid duplicates
+          const existingIds = new Set(prev.map(p => p.id));
+          const newPlayers = paginatedData.players.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newPlayers];
+        });
+      }
+    }
+  }, [paginatedData, page]);
 
   const { data: searchResults } = trpc.player.search.useQuery(
     { query: debouncedSearch },
@@ -538,7 +547,13 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
 
         {isAdmin && (
           <div className="flex gap-2">
-            <Button onClick={() => setShowUploadDialog(true)}>
+            <Button onClick={() => {
+              if (!player?.id) {
+                toast.error("خطأ: معرف اللاعب غير موجود");
+                return;
+              }
+              setShowUploadDialog(true);
+            }}>
               <Upload className="w-4 h-4 ml-2" />
               رفع صور جديدة
             </Button>
@@ -601,7 +616,7 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
         )}
 
         {/* Upload Dialog */}
-        {showUploadDialog && (
+        {showUploadDialog && player?.id && (
           <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
             <DialogContent>
               <DialogHeader>
