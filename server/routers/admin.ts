@@ -5,10 +5,9 @@ import { admins, users } from "../../drizzle/schema";
 import { getDb } from "../db";
 import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
-import { SignJWT } from "jose";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "../_core/cookies";
-import { ENV } from "../_core/env";
+import { createAdminSession, deleteAdminSession } from "../adminSession";
+
+const ADMIN_SESSION_COOKIE = "admin_session";
 
 export const adminRouter = router({
   /**
@@ -76,16 +75,17 @@ export const adminRouter = router({
           .limit(1);
       }
 
-      // Create JWT session token
-      const token = await new SignJWT({ openId: adminOpenId })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("30d")
-        .sign(new TextEncoder().encode(ENV.jwtSecret));
+      // Create session
+      const sessionId = createAdminSession(admin[0].id, admin[0].username);
 
-      // Set session cookie
-      const cookieOptions = getSessionCookieOptions({ secure: true });
-      ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+      // Set session cookie (simple, no JWT needed)
+      ctx.res.cookie(ADMIN_SESSION_COOKIE, sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        path: "/",
+      });
 
       // Return admin info (without password)
       return {
@@ -93,6 +93,18 @@ export const adminRouter = router({
         username: admin[0].username,
       };
     }),
+
+  /**
+   * Logout
+   */
+  logout: publicProcedure.mutation(({ ctx }) => {
+    const sessionId = ctx.req.cookies?.[ADMIN_SESSION_COOKIE];
+    if (sessionId) {
+      deleteAdminSession(sessionId);
+      ctx.res.clearCookie(ADMIN_SESSION_COOKIE);
+    }
+    return { success: true };
+  }),
 
   /**
    * Seed initial admins (for setup only)
