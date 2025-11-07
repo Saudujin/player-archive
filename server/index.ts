@@ -2,11 +2,15 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import { seedAdmins } from "./seed-admins";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  // Auto-seed admin accounts on startup
+  await seedAdmins();
+
   const app = express();
   const server = createServer(app);
 
