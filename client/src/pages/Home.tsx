@@ -555,13 +555,11 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
                 <DialogTitle>رفع صور جديدة</DialogTitle>
               </DialogHeader>
               <FastImageUpload
-                onUploadComplete={(url) => {
-                  // Save to database
-                  toast.success("تم رفع الصورة");
+                playerId={player.id}
+                onSuccess={() => {
                   setShowUploadDialog(false);
                   refetchImages();
                 }}
-                buttonText="اختر الصور"
                 multiple
               />
             </DialogContent>
