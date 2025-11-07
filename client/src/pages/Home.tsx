@@ -94,8 +94,14 @@ export default function Home() {
   // Reset pagination when search changes
   useEffect(() => {
     if (debouncedSearch.trim()) {
+      // Clear players when searching
       setPage(0);
       setAllPlayers([]);
+    } else {
+      // Reload players when search is cleared
+      setPage(0);
+      setAllPlayers([]);
+      refetchPlayers();
     }
   }, [debouncedSearch]);
 
