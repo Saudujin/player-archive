@@ -128,7 +128,7 @@ const db = {
     const dbInstance = await getDb();
     if (!dbInstance) throw new Error("Database not available");
     const result = await dbInstance.insert(playerImages).values(image);
-    return result;
+    return Number(result.insertId);
   },
 
   async deletePlayerImage(id: number) {
