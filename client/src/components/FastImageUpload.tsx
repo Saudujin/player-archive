@@ -81,17 +81,20 @@ export function FastImageUpload({
             },
             credentials: "include",
             body: JSON.stringify({
-              fileName: fileItem.file.name,
-              contentType: fileItem.file.type,
+              json: {
+                fileName: fileItem.file.name,
+                contentType: fileItem.file.type,
+              },
             }),
           });
 
           if (!uploadUrlResponse.ok) {
-            throw new Error("Failed to get upload URL");
+            const errorText = await uploadUrlResponse.text();
+            throw new Error(`Failed to get upload URL: ${errorText}`);
           }
 
           const uploadUrlData = await uploadUrlResponse.json();
-          const { uploadUrl, publicUrl, key } = uploadUrlData.result.data;
+          const { uploadUrl, publicUrl, key } = uploadUrlData.result.data.json;
 
           // Upload directly to S3
           await uploadToS3(fileItem.file, uploadUrl);
@@ -129,9 +132,11 @@ export function FastImageUpload({
               },
               credentials: "include",
               body: JSON.stringify({
-                playerId,
-                imageUrl: result.imageUrl,
-                imageKey: result.imageKey,
+                json: {
+                  playerId,
+                  imageUrl: result.imageUrl,
+                  imageKey: result.imageKey,
+                },
               }),
             });
 
