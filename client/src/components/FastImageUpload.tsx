@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, X, Check } from "lucide-react";
@@ -12,23 +11,22 @@ interface FastImageUploadProps {
   multiple?: boolean;
 }
 
-interface UploadingFile {
+type UploadingFile = {
   file: File;
   progress: number;
   status: "pending" | "uploading" | "success" | "error";
   error?: string;
-  uploadUrl?: string;
   publicUrl?: string;
   key?: string;
-}
+};
 
-export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastImageUploadProps) {
+export function FastImageUpload({
+  playerId,
+  onSuccess,
+  multiple = false,
+}: FastImageUploadProps) {
   const [files, setFiles] = useState<UploadingFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-
-  const getUploadUrlMutation = trpc.playerImage.getUploadUrl.useMutation();
-  const confirmUploadMutation = trpc.playerImage.confirmUpload.useMutation();
-  const batchConfirmMutation = trpc.playerImage.batchConfirmUpload.useMutation();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -75,11 +73,25 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
         if (fileItem.status !== "pending") continue;
 
         try {
-          // Get presigned URL
-          const { uploadUrl, publicUrl, key } = await getUploadUrlMutation.mutateAsync({
-            fileName: fileItem.file.name,
-            contentType: fileItem.file.type,
+          // Get presigned URL via fetch
+          const uploadUrlResponse = await fetch("/api/trpc/playerImage.getUploadUrl", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              fileName: fileItem.file.name,
+              contentType: fileItem.file.type,
+            }),
           });
+
+          if (!uploadUrlResponse.ok) {
+            throw new Error("Failed to get upload URL");
+          }
+
+          const uploadUrlData = await uploadUrlResponse.json();
+          const { uploadUrl, publicUrl, key } = uploadUrlData.result.data;
 
           // Upload directly to S3
           await uploadToS3(fileItem.file, uploadUrl);
@@ -105,42 +117,42 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
         }
       }
 
-      // Confirm uploads in database (one by one)
+      // Confirm uploads in database via fetch
       if (uploadResults.length > 0) {
         let confirmedCount = 0;
         for (const result of uploadResults) {
           try {
-            await new Promise<void>((resolve, reject) => {
-              confirmUploadMutation.mutate(
-                {
-                  playerId,
-                  imageUrl: result.imageUrl,
-                  imageKey: result.imageKey,
-                },
-                {
-                  onSuccess: () => {
-                    confirmedCount++;
-                    resolve();
-                  },
-                  onError: (error: any) => {
-                    console.error('Confirm error:', error);
-                    reject(error);
-                  },
-                }
-              );
+            const confirmResponse = await fetch("/api/trpc/playerImage.confirmUpload", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify({
+                playerId,
+                imageUrl: result.imageUrl,
+                imageKey: result.imageKey,
+              }),
             });
+
+            if (confirmResponse.ok) {
+              confirmedCount++;
+            } else {
+              console.error("Failed to confirm image:", await confirmResponse.text());
+            }
           } catch (confirmError: any) {
-            console.error('Failed to confirm image:', confirmError);
-            toast.error(`فشل تأكيد صورة: ${confirmError.message || 'خطأ غير معروف'}`);
+            console.error("Failed to confirm image:", confirmError);
           }
         }
-        
+
         if (confirmedCount > 0) {
           toast.success(`تم رفع ${confirmedCount} صورة بنجاح!`);
           setFiles([]);
           if (onSuccess) {
             onSuccess();
           }
+        } else {
+          toast.error("فشل تأكيد الصور في قاعدة البيانات");
         }
       }
     } catch (error: any) {
