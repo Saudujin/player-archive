@@ -143,7 +143,9 @@ export function FastImageUpload({
             if (confirmResponse.ok) {
               confirmedCount++;
             } else {
-              console.error("Failed to confirm image:", await confirmResponse.text());
+              const errorText = await confirmResponse.text();
+              console.error("Failed to confirm image:", errorText);
+              toast.error(`فشل تأكيد صورة: ${errorText.substring(0, 100)}`);
             }
           } catch (confirmError: any) {
             console.error("Failed to confirm image:", confirmError);
