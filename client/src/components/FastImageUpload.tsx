@@ -127,8 +127,8 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
   };
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="flex flex-col h-full max-h-[60vh]">
+      <div className="mb-4">
         <label className="block mb-2 text-sm font-medium">
           {multiple ? "اختر صور متعددة" : "اختر صورة"}
         </label>
@@ -143,59 +143,63 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
       </div>
 
       {files.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium">
-            الصور المحددة ({files.length})
-          </div>
-          {files.map((fileItem, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 p-2 border rounded-lg"
-            >
-              <div className="flex-1">
-                <div className="text-sm font-medium truncate">
-                  {fileItem.file.name}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {(fileItem.file.size / 1024 / 1024).toFixed(2)} MB
-                </div>
-                {fileItem.status === "uploading" && (
-                  <Progress value={fileItem.progress} className="mt-1" />
-                )}
-                {fileItem.status === "error" && (
-                  <div className="text-xs text-red-500 mt-1">
-                    {fileItem.error}
-                  </div>
-                )}
-              </div>
-              <div>
-                {fileItem.status === "success" && (
-                  <Check className="w-5 h-5 text-green-500" />
-                )}
-                {fileItem.status === "pending" && !isUploading && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(index)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
+        <>
+          {/* Scrollable file list */}
+          <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-2">
+            <div className="text-sm font-medium sticky top-0 bg-background pb-2">
+              الصور المحددة ({files.length})
             </div>
-          ))}
-        </div>
-      )}
-
-      {files.length > 0 && (
-        <Button
-          onClick={handleUpload}
-          disabled={isUploading || files.every((f) => f.status !== "pending")}
-          className="w-full"
-        >
-          <Upload className="w-4 h-4 ml-2" />
-          {isUploading ? "جاري الرفع..." : `رفع ${files.filter((f) => f.status === "pending").length} صورة`}
-        </Button>
+            {files.map((fileItem, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 p-2 border rounded-lg"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {fileItem.file.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {(fileItem.file.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
+                  {fileItem.status === "uploading" && (
+                    <Progress value={fileItem.progress} className="mt-1" />
+                  )}
+                  {fileItem.status === "error" && (
+                    <div className="text-xs text-red-500 mt-1">
+                      {fileItem.error}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-shrink-0">
+                  {fileItem.status === "success" && (
+                    <Check className="w-5 h-5 text-green-500" />
+                  )}
+                  {fileItem.status === "pending" && !isUploading && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(index)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Sticky upload button */}
+          <div className="border-t pt-4">
+            <Button
+              onClick={handleUpload}
+              disabled={isUploading || files.every((f) => f.status !== "pending")}
+              className="w-full"
+            >
+              <Upload className="w-4 h-4 ml-2" />
+              {isUploading ? "جاري الرفع..." : `رفع ${files.filter((f) => f.status === "pending").length} صورة`}
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );
