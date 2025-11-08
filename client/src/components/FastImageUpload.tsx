@@ -105,34 +105,43 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
         }
       }
 
-      // Confirm uploads in database
+      // Confirm uploads in database (one by one)
       if (uploadResults.length > 0) {
-        await new Promise<void>((resolve, reject) => {
-          batchConfirmMutation.mutate(
-            {
-              playerId,
-              images: uploadResults.map((r) => ({
-                imageUrl: r.imageUrl,
-                imageKey: r.imageKey,
-              })),
-            },
-            {
-              onSuccess: () => {
-                toast.success(`تم رفع ${uploadResults.length} صورة بنجاح!`);
-                setFiles([]);
-                if (onSuccess) {
-                  onSuccess();
+        let confirmedCount = 0;
+        for (const result of uploadResults) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              confirmUploadMutation.mutate(
+                {
+                  playerId,
+                  imageUrl: result.imageUrl,
+                  imageKey: result.imageKey,
+                },
+                {
+                  onSuccess: () => {
+                    confirmedCount++;
+                    resolve();
+                  },
+                  onError: (error: any) => {
+                    console.error('Confirm error:', error);
+                    reject(error);
+                  },
                 }
-                resolve();
-              },
-              onError: (error: any) => {
-                console.error('Confirm error:', error);
-                toast.error(`فشل تأكيد الرفع: ${error.message || 'خطأ غير معروف'}`);
-                reject(error);
-              },
-            }
-          );
-        });
+              );
+            });
+          } catch (confirmError: any) {
+            console.error('Failed to confirm image:', confirmError);
+            toast.error(`فشل تأكيد صورة: ${confirmError.message || 'خطأ غير معروف'}`);
+          }
+        }
+        
+        if (confirmedCount > 0) {
+          toast.success(`تم رفع ${confirmedCount} صورة بنجاح!`);
+          setFiles([]);
+          if (onSuccess) {
+            onSuccess();
+          }
+        }
       }
     } catch (error: any) {
       toast.error(`فشل الرفع: ${error.message}`);
