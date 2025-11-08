@@ -107,24 +107,32 @@ export function FastImageUpload({ playerId, onSuccess, multiple = true }: FastIm
 
       // Confirm uploads in database
       if (uploadResults.length > 0) {
-        try {
-          await batchConfirmMutation.mutateAsync({
-            playerId,
-            images: uploadResults.map((r) => ({
-              imageUrl: r.imageUrl,
-              imageKey: r.imageKey,
-            })),
-          });
-
-          toast.success(`تم رفع ${uploadResults.length} صورة بنجاح!`);
-          setFiles([]);
-          if (onSuccess) {
-            onSuccess();
-          }
-        } catch (confirmError: any) {
-          console.error('Confirm error:', confirmError);
-          toast.error(`فشل تأكيد الرفع: ${confirmError.message || 'خطأ غير معروف'}`);
-        }
+        await new Promise<void>((resolve, reject) => {
+          batchConfirmMutation.mutate(
+            {
+              playerId,
+              images: uploadResults.map((r) => ({
+                imageUrl: r.imageUrl,
+                imageKey: r.imageKey,
+              })),
+            },
+            {
+              onSuccess: () => {
+                toast.success(`تم رفع ${uploadResults.length} صورة بنجاح!`);
+                setFiles([]);
+                if (onSuccess) {
+                  onSuccess();
+                }
+                resolve();
+              },
+              onError: (error: any) => {
+                console.error('Confirm error:', error);
+                toast.error(`فشل تأكيد الرفع: ${error.message || 'خطأ غير معروف'}`);
+                reject(error);
+              },
+            }
+          );
+        });
       }
     } catch (error: any) {
       toast.error(`فشل الرفع: ${error.message}`);
