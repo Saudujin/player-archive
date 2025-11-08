@@ -26,6 +26,10 @@ import {
   Trash2,
   Edit,
   Image as ImageIcon,
+  Share2,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
@@ -203,6 +207,49 @@ export default function Home() {
 
       {/* Players Grid */}
       <div className="container py-8">
+        {/* Statistics Bar */}
+        {!searchQuery.trim() && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold">{allPlayers.length}</div>
+                <div className="text-sm text-muted-foreground">عدد اللاعبين</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold">
+                  {allPlayers.reduce((sum, p) => {
+                    try {
+                      const kw = p.keywords ? JSON.parse(p.keywords) : [];
+                      return sum + (Array.isArray(kw) ? kw.length : 0);
+                    } catch {
+                      return sum;
+                    }
+                  }, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">الكلمات المفتاحية</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold">
+                  {allPlayers.filter(p => p.teamName).length}
+                </div>
+                <div className="text-sm text-muted-foreground">لاعبين مع فرق</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold">
+                  {allPlayers.filter(p => p.coverImageUrl).length}
+                </div>
+                <div className="text-sm text-muted-foreground">مع صور غلاف</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {displayedPlayers.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -215,7 +262,7 @@ export default function Home() {
           </Card>
         ) : (
           <>
-            <div className="mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <Badge variant="secondary">{displayedPlayers.length} لاعب</Badge>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -294,6 +341,10 @@ export default function Home() {
 // Player Card Component
 function PlayerCard({ player, isAdmin, onViewGallery, onEdit, onDelete }: any) {
   const keywords = player.keywords ? JSON.parse(player.keywords) : [];
+  const { data: imageCount } = trpc.playerImage.list.useQuery(
+    { playerId: player.id },
+    { select: (data) => data.length }
+  );
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -309,6 +360,14 @@ function PlayerCard({ player, isAdmin, onViewGallery, onEdit, onDelete }: any) {
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <ImageIcon className="w-12 h-12 text-muted-foreground" />
+          </div>
+        )}
+        {imageCount !== undefined && imageCount > 0 && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="secondary" className="bg-black/70 text-white border-0">
+              <ImageIcon className="w-3 h-3 ml-1" />
+              {imageCount}
+            </Badge>
           </div>
         )}
       </div>
@@ -338,6 +397,18 @@ function PlayerCard({ player, isAdmin, onViewGallery, onEdit, onDelete }: any) {
           >
             <ImageIcon className="w-4 h-4 ml-1" />
             الألبوم
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const url = `${window.location.origin}?player=${player.id}`;
+              navigator.clipboard.writeText(url);
+              toast.success("تم نسخ الرابط!");
+            }}
+            title="مشاركة رابط"
+          >
+            <Share2 className="w-4 h-4" />
           </Button>
           {isAdmin && (
             <>
@@ -652,6 +723,35 @@ function GalleryDialog({ open, onOpenChange, player, isAdmin }: any) {
                   alt=""
                   className="w-full h-auto rounded"
                 />
+                {/* Navigation arrows */}
+                {images.length > 1 && (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute left-2 top-1/2 -translate-y-1/2"
+                      onClick={() => {
+                        const currentIndex = images.findIndex((img: any) => img.id === selectedImage.id);
+                        const prevIndex = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
+                        setSelectedImage(images[prevIndex]);
+                      }}
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                      onClick={() => {
+                        const currentIndex = images.findIndex((img: any) => img.id === selectedImage.id);
+                        const nextIndex = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
+                        setSelectedImage(images[nextIndex]);
+                      }}
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </Button>
+                  </>
+                )}
                 <div className="absolute top-2 right-2 flex gap-2">
                   <Button
                     size="sm"
