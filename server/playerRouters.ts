@@ -181,7 +181,7 @@ export const playerImageRouter = router({
         imageUrl: input.imageUrl,
         imageKey: input.imageKey,
         caption: input.caption,
-        uploadedBy: ctx.user.id,
+        uploadedBy: ctx.user?.id, // Optional - may be undefined
       });
 
       return { success: true, url: input.imageUrl };
@@ -208,7 +208,7 @@ export const playerImageRouter = router({
           imageUrl: img.imageUrl,
           imageKey: img.imageKey,
           caption: img.caption,
-          uploadedBy: ctx.user.id,
+          uploadedBy: ctx.user?.id, // Optional - may be undefined
         });
       }
 

@@ -1,0 +1,1 @@
+ALTER TABLE `playerImages` MODIFY COLUMN `uploadedBy` int;

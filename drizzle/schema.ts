@@ -61,7 +61,7 @@ export const playerImages = mysqlTable("playerImages", {
   isUpscaled: boolean("isUpscaled").default(false),
   originalImageId: int("originalImageId"), // Reference to original image if this is upscaled version
   uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
-  uploadedBy: int("uploadedBy").notNull(),
+  uploadedBy: int("uploadedBy"), // Nullable - may not have user context
 });
 
 export type PlayerImage = typeof playerImages.$inferSelect;
