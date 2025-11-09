@@ -128,7 +128,9 @@ const db = {
     const dbInstance = await getDb();
     if (!dbInstance) throw new Error("Database not available");
     const result = await dbInstance.insert(playerImages).values(image);
-    return Number(result.insertId);
+    // drizzle-orm mysql2 returns [ResultSetHeader, FieldPacket[]]
+    const insertId = (result as any)[0]?.insertId || (result as any).insertId;
+    return Number(insertId);
   },
 
   async deletePlayerImage(id: number) {
