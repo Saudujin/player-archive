@@ -176,7 +176,7 @@ export const playerImageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const imageId = await db.createPlayerImage({
+      await db.createPlayerImage({
         playerId: input.playerId,
         imageUrl: input.imageUrl,
         imageKey: input.imageKey,
@@ -184,7 +184,7 @@ export const playerImageRouter = router({
         uploadedBy: ctx.user.id,
       });
 
-      return { id: imageId, url: input.imageUrl };
+      return { success: true, url: input.imageUrl };
     }),
 
   // Admin: Batch confirm uploads (for multiple images)
@@ -202,19 +202,17 @@ export const playerImageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const imageIds = [];
       for (const img of input.images) {
-        const imageId = await db.createPlayerImage({
+        await db.createPlayerImage({
           playerId: input.playerId,
           imageUrl: img.imageUrl,
           imageKey: img.imageKey,
           caption: img.caption,
           uploadedBy: ctx.user.id,
         });
-        imageIds.push(imageId);
       }
 
-      return { ids: imageIds };
+      return { success: true, count: input.images.length };
     }),
 
   // Admin: Upload image (legacy - for backward compatibility)
